@@ -1,0 +1,16 @@
+# Servers are configured here
+servers:
+  lobby:
+    showProxyPlayers: true
+    showProxyFavicon: true
+    showProxyMotd: true
+    showProxyVersion: true
+  factions:
+    showProxyPlayers: false
+    showProxyFavicon: true
+    showProxyMotd: false
+    showProxyVersion: true
+# True if you want to enable this plugin for forced hosts
+useForcedHosts: true
+# Delay between each ping update (ms)
+delay: 10000
