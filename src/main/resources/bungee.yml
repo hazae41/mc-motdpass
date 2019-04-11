@@ -1,0 +1,4 @@
+name: MOTDPassthrough
+version: @version@
+main: hazae41.minecraft.motdpass.Plugin
+author: hazae41
