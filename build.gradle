@@ -3,7 +3,7 @@ plugins {
 }
 
 group 'hazae41'
-version '5.0'
+version '5.0.1'
 
 apply from: 'mcplugin.gradle'
 apply from: 'bungeecord.gradle'
