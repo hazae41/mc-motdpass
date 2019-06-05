@@ -1,16 +1,17 @@
+# Delay between each ping update
+# can be [seconds, minutes, hours]
+delay: 10 seconds
 # Servers are configured here
 servers:
   lobby:
-    showProxyPlayers: true
-    showProxyFavicon: true
-    showProxyMotd: true
-    showProxyVersion: true
+    players: false
+    favicon: false
+    motd: true
+    version: false
+    mods: true
   factions:
-    showProxyPlayers: false
-    showProxyFavicon: true
-    showProxyMotd: false
-    showProxyVersion: true
-# True if you want to enable this plugin for forced hosts
-useForcedHosts: true
-# Delay between each ping update (ms)
-delay: 10000
+    players: true
+    favicon: true
+    motd: true
+    version: true
+    mods: true

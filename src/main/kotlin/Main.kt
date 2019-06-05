@@ -1,83 +1,74 @@
 package hazae41.minecraft.motdpass
 
+import hazae41.minecraft.kotlin.*
 import hazae41.minecraft.kotlin.bungee.*
-import hazae41.minecraft.kotlin.catch
-import hazae41.minecraft.kotlin.get
-import hazae41.minecraft.kotlin.lowerCase
-import hazae41.minecraft.kotlin.not
 import net.md_5.bungee.api.ChatColor.LIGHT_PURPLE
 import net.md_5.bungee.api.ServerPing
 import net.md_5.bungee.api.ServerPing.PlayerInfo
 import net.md_5.bungee.api.config.ServerInfo
 import net.md_5.bungee.api.event.ProxyPingEvent
 import net.md_5.bungee.config.Configuration
+import java.util.concurrent.TimeUnit
 
 class Plugin : BungeePlugin() {
 
-    companion object { var instance: Plugin? = null }
-
-    override fun onEnable() = catch<Exception>{
-        update(9651, LIGHT_PURPLE)
-        config = loadConfig(configFile)
-        schedule()
-        listen()
-        command()
-        instance = this
-    }
-
-    override fun onDisable() { cancelTasks() }
-
-    fun schedule(){
-        cancelTasks()
-        val delay = config.getLong("delay").not(0) ?: 1000L
-        schedule(period = delay){pingAll()}
-    }
-
     val motds = mutableMapOf<String, ServerPing?>()
 
-    val configFile get() = dataFolder["config.yml"]
-    lateinit var config: Configuration
-
-    fun ping(server: ServerInfo)
-            = server.ping { res, _ -> motds[server.name] = res }
-    fun pingAll() = proxy.servers.values.forEach(::ping)
-
-    fun command() = command("motdpass") h@ { args ->
-        if (!hasPermission("motdpass.reload"))
-            return@h msg("§cYou do not have permission.")
-        if (args.isEmpty() || args[0] != "reload")
-            return@h msg("&c/motdpass <reload>")
-        config = loadConfig(configFile, "config.yml")
-        schedule(); msg("§bConfig reloaded")
+    override fun onEnable(){
+        update(9651)
+        init(Config)
+        makeTimer()
+        makeEvents()
     }
+}
 
-    val playerInfos get()
-    = proxy.players.map{
-            PlayerInfo(it.name, it.uniqueId.toString())
-        }.toTypedArray()
+object Config: PluginConfigFile("config"){
+    override var minDelay = 10000L
 
-    fun listen() = listen<ProxyPingEvent> h@ {
-        val listener = it.connection.listener
-        val host = it.connection.virtualHost?.hostString?.lowerCase ?: return@h
-        val hosts = listener.forcedHosts
+    val delay by string("delay")
 
-        val useForcedHosts = config.getBoolean("useForcedHosts")
+    class Server(name: String): ConfigSection(this, "servers.$name"){
+        val players by boolean("players")
+        val favicon by boolean("favicon")
+        val motd by boolean("motd")
+        val version by boolean("version")
+        val mods by boolean("mods")
+    }
+}
 
-        val name =
-            if (useForcedHosts && host in hosts) hosts[host]
-            else listener.serverPriority[0]
+fun Plugin.makeTimer(){
+    schedule(async = true){ pingAll() }
+    val (value, unit) = Config.delay.toTimeWithUnit()
+    val delay = unit.toSeconds(value).not(0) ?: 10
+    schedule(
+        delay = delay,
+        unit = TimeUnit.SECONDS,
+        callback = { makeTimer() }
+    )
+}
 
-        config.getSection("servers.$name")?.apply {
-            it.response = motds[name]?.apply {
-                if (getBoolean("showProxyPlayers"))
-                    players = ServerPing.Players(listener.maxPlayers, proxy.onlineCount, playerInfos)
-                if (getBoolean("showProxyFavicon"))
-                    setFavicon(proxy.config.faviconObject)
-                if (getBoolean("showProxyMotd"))
-                    description = listener.motd
-                if (getBoolean("showProxyVersion"))
-                    version = ServerPing.Protocol("BungeeCord", proxy.protocolVersion)
-            }
+fun Plugin.ping(server: ServerInfo) = server.ping { res, _ -> motds[server.name] = res }
+fun Plugin.pingAll() = proxy.servers.values.forEach(::ping)
+
+val Plugin.playerInfos
+    get() = proxy.players.map{
+        PlayerInfo(it.name, it.uniqueId.toString())
+    }.toTypedArray()
+
+fun Plugin.makeEvents() = listen<ProxyPingEvent>{
+    val listener = it.connection.listener
+    val host = it.connection.virtualHost?.hostString?.lowerCase ?: return@listen
+    val name = listener.forcedHosts[host] ?: listener.serverPriority[0] ?: return@listen
+    val config = Config.Server(name)
+
+    it.response = motds[name]?.apply {
+        if(!config.players) players = ServerPing.Players(listener.maxPlayers, proxy.onlineCount, playerInfos)
+        if(!config.favicon) setFavicon(proxy.config.faviconObject)
+        if(!config.motd) description = listener.motd
+        if(!config.version) version = ServerPing.Protocol("BungeeCord", it.connection.version)
+        if(!config.mods) modinfo.apply {
+            modList = emptyList()
+            type = "FML"
         }
     }
 }
