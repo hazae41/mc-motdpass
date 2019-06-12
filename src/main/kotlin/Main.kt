@@ -50,25 +50,24 @@ fun Plugin.makeTimer(){
 fun Plugin.ping(server: ServerInfo) = server.ping { res, _ -> motds[server.name] = res }
 fun Plugin.pingAll() = proxy.servers.values.forEach(::ping)
 
-val Plugin.playerInfos
-    get() = proxy.players.map{
-        PlayerInfo(it.name, it.uniqueId.toString())
-    }.toTypedArray()
-
 fun Plugin.makeEvents() = listen<ProxyPingEvent>{
     val listener = it.connection.listener
     val host = it.connection.virtualHost?.hostString?.lowerCase ?: return@listen
     val name = listener.forcedHosts[host] ?: listener.serverPriority[0] ?: return@listen
     val config = Config.Server(name)
+    val sub = motds[name] ?: return@listen
 
-    it.response = motds[name]?.apply {
-        if(!config.players) players = ServerPing.Players(listener.maxPlayers, proxy.onlineCount, playerInfos)
-        if(!config.favicon) setFavicon(proxy.config.faviconObject)
-        if(!config.motd) description = listener.motd
-        if(!config.version) version = ServerPing.Protocol("BungeeCord", it.connection.version)
-        if(!config.mods) modinfo.apply {
-            modList = emptyList()
-            type = "FML"
+    it.response.apply {
+        if(config.players) players = sub.players
+        if(config.favicon) setFavicon(sub.faviconObject)
+        if(config.motd) descriptionComponent = sub.descriptionComponent
+        version = run {
+            if (config.version) sub.version
+            else ServerPing.Protocol("BungeeCord", it.connection.version)
+        }
+        if(config.mods) modinfo.apply {
+            modList = sub.modinfo.modList
+            type = sub.modinfo.type
         }
     }
 }
